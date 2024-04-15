@@ -1,4 +1,5 @@
 import argparse
+import os
 
 import jax
 import flax
@@ -15,10 +16,9 @@ import jax_enhance
 
 
 def main(cfg):
-    train_dataset = torch_enhance.datasets.BSDS500(
+    train_dataset = torch_enhance.datasets.TD91(
         scale_factor=cfg.scale_factor,
         image_size=cfg.image_size,
-        set_type="train"
     )
     train_dataloader = DataLoader(
         train_dataset,
@@ -69,7 +69,8 @@ def main(cfg):
 
             n_iter += 1
 
-        checkpoints.save_checkpoint(ckpt_dir=writer.log_dir, target=state, step=f"epoch_{epoch}", keep=5)
+        ckpt_dir = os.path.join(os.getcwd(), writer.log_dir)
+        checkpoints.save_checkpoint(ckpt_dir=ckpt_dir, target=state, step=f"epoch_{epoch}", keep=5)
 
 
 def compute_metrics(predictions, targets):
@@ -83,7 +84,7 @@ def compute_metrics(predictions, targets):
 def train_step(state, model, batch):
     def loss_fn(params):
         sr = model.apply({"params": params}, batch["lr"])
-        loss = jax_enhance.losses.mse(sr, batch["hr"])
+        loss = jax_enhance.metrics.mse(sr, batch["hr"])
         return loss, sr
 
     grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
@@ -98,7 +99,7 @@ def train_step(state, model, batch):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model", type=str, choices=jax_enhance.models.__all__, default="ESPCN")
+    parser.add_argument("--model", type=str, choices=jax_enhance.models.__all__, default="SRCNN")
     parser.add_argument("--epochs", type=int, default=25)
     parser.add_argument("--batch_size", type=int, default=8)
     parser.add_argument("--scale_factor", type=int, default=2)
